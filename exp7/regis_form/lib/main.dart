@@ -83,13 +83,29 @@ class _RegistrationFormState extends State<RegistrationForm> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEDE7F6),
+      backgroundColor: const Color.fromARGB(255, 144, 70, 255),
       appBar: AppBar(
-        title: const Text("Register"),
-        backgroundColor: const Color.fromARGB(255, 157, 255, 170),
-        foregroundColor: const Color.fromARGB(255, 0, 0, 0),
-        elevation: 0,
+  backgroundColor: const Color.fromARGB(255, 157, 255, 170),
+  elevation: 0,
+  centerTitle: true, // <-- centers the title
+  title: ShaderMask(
+    shaderCallback: (bounds) => const LinearGradient(
+      colors: [Color.fromARGB(255, 144, 70, 255), Colors.pink],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ).createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height)),
+    child: const Text(
+      "Register",
+      style: TextStyle(
+        fontSize: 28,
+        fontWeight: FontWeight.bold,
+        fontFamily: 'Roboto', // your custom font
+        color: Colors.white,  // the actual color will come from the gradient
       ),
+    ),
+  ),
+),
+
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(25.0),
@@ -98,7 +114,7 @@ class _RegistrationFormState extends State<RegistrationForm> {
               borderRadius: BorderRadius.circular(20),
             ),
             elevation: 6,
-            color: const Color.fromARGB(255, 218, 255, 210),
+            color: const Color.fromARGB(255, 223, 206, 255),
             child: Padding(
               padding: const EdgeInsets.all(20.0),
               child: Form(
