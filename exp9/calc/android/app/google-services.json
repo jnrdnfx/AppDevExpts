@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "27720666127",
+    "project_id": "calc-exp9",
+    "storage_bucket": "calc-exp9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:27720666127:android:c2deb44e86de5740b7a77a",
+        "android_client_info": {
+          "package_name": "com.example.calc"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDWNdmgwGiV_J73tPY6lydPd0i7uHixdXw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
