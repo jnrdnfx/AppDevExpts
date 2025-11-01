@@ -191,6 +191,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#afff59ff', // light gray background
   },
   container: {
+    marginTop: 20,
     alignItems: 'center',
     padding: 20,
     minHeight: '100%',
