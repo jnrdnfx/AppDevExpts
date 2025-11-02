@@ -1,15 +1,23 @@
 class Task {
   final int? id;
   final String title;
-  final int isDone;
+  final bool isDone;
 
-  Task({this.id, required this.title, this.isDone = 0});
+  Task({this.id, required this.title, required this.isDone});
+
+  Task copyWith({int? id, String? title, bool? isDone}) {
+    return Task(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      isDone: isDone ?? this.isDone,
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
       'title': title,
-      'isDone': isDone,
+      'isDone': isDone ? 1 : 0,
     };
   }
 
@@ -17,7 +25,7 @@ class Task {
     return Task(
       id: map['id'],
       title: map['title'],
-      isDone: map['isDone'],
+      isDone: map['isDone'] == 1,
     );
   }
 }

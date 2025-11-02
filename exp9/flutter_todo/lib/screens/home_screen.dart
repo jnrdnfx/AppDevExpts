@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/task_model.dart';
 import '../db/database_helper.dart';
+import '../models/task_model.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -10,16 +10,16 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final TextEditingController _controller = TextEditingController();
   late Future<List<Task>> _taskList;
+  final TextEditingController _controller = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _refreshTaskList();
+    _refreshTasks();
   }
 
-  void _refreshTaskList() {
+  void _refreshTasks() {
     setState(() {
       _taskList = DatabaseHelper.instance.getTasks();
     });
@@ -27,121 +27,158 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _addTask(String title) async {
     if (title.trim().isEmpty) return;
-    await DatabaseHelper.instance.insertTask(Task(title: title));
+    final newTask = Task(title: title, isDone: false);
+    await DatabaseHelper.instance.insertTask(newTask);
     _controller.clear();
-    _refreshTaskList();
+    _refreshTasks();
   }
 
-  Future<void> _toggleDone(Task task) async {
-    await DatabaseHelper.instance.updateTask(
-      Task(id: task.id, title: task.title, isDone: task.isDone == 0 ? 1 : 0),
-    );
-    _refreshTaskList();
+  Future<void> _toggleTask(Task task) async {
+    final updated = task.copyWith(isDone: !task.isDone);
+    await DatabaseHelper.instance.updateTask(updated);
+    _refreshTasks();
   }
 
   Future<void> _deleteTask(int id) async {
     await DatabaseHelper.instance.deleteTask(id);
-    _refreshTaskList();
+    _refreshTasks();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F5F7),
       appBar: AppBar(
-        title: const Text('Todo List'),
-        centerTitle: true,
+        title: const Text('My Tasks'),
         backgroundColor: Colors.blueAccent,
-        elevation: 1,
+        elevation: 0,
+        centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Input Field
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    decoration: InputDecoration(
-                      hintText: 'Enter new task...',
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
+      body: FutureBuilder<List<Task>>(
+        future: _taskList,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: Colors.blueAccent),
+            );
+          }
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                'Something went wrong!',
+                style: TextStyle(color: Colors.red.shade400, fontSize: 16),
+              ),
+            );
+          }
+
+          final tasks = snapshot.data ?? [];
+
+          if (tasks.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.task_alt_outlined,
+                        size: 90, color: Colors.grey),
+                    const SizedBox(height: 20),
+                    Text(
+                      "No tasks yet!",
+                      style: TextStyle(
+                        fontSize: 20,
+                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                ElevatedButton(
-                  onPressed: () => _addTask(_controller.text),
-                  style: ElevatedButton.styleFrom(
-                    shape: const CircleBorder(),
-                    padding: const EdgeInsets.all(16),
-                    backgroundColor: Colors.blueAccent,
-                  ),
-                  child: const Icon(Icons.add, color: Colors.white),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Task List
-            Expanded(
-              child: FutureBuilder<List<Task>>(
-                future: _taskList,
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.data!.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        "No tasks yet. Add one!",
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                    const SizedBox(height: 10),
+                    Text(
+                      "Add your first task using the box below.",
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey.shade600,
                       ),
-                    );
-                  }
-                  return ListView.builder(
-                    itemCount: snapshot.data!.length,
-                    itemBuilder: (context, index) {
-                      final task = snapshot.data![index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ListTile(
-                          leading: Checkbox(
-                            value: task.isDone == 1,
-                            onChanged: (_) => _toggleDone(task),
-                            activeColor: Colors.blueAccent,
-                          ),
-                          title: Text(
-                            task.title,
-                            style: TextStyle(
-                              decoration: task.isDone == 1
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                              color: task.isDone == 1 ? Colors.grey : Colors.black,
-                              fontSize: 16,
-                            ),
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.redAccent),
-                            onPressed: () => _deleteTask(task.id!),
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            itemCount: tasks.length,
+            itemBuilder: (context, index) {
+              final task = tasks[index];
+              return Card(
+                margin:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 2,
+                child: ListTile(
+                  leading: Checkbox(
+                    activeColor: Colors.blueAccent,
+                    value: task.isDone,
+                    onChanged: (_) => _toggleTask(task),
+                  ),
+                  title: Text(
+                    task.title,
+                    style: TextStyle(
+                      fontSize: 17,
+                      decoration: task.isDone
+                          ? TextDecoration.lineThrough
+                          : TextDecoration.none,
+                      color: task.isDone
+                          ? Colors.grey
+                          : Colors.black87,
+                    ),
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline,
+                        color: Colors.redAccent),
+                    onPressed: () => _deleteTask(task.id!),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+      bottomNavigationBar: Padding(
+        padding:
+            const EdgeInsets.only(bottom: 20, left: 20, right: 20, top: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                decoration: InputDecoration(
+                  hintText: "Enter a new task...",
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            ElevatedButton(
+              onPressed: () => _addTask(_controller.text),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              ),
+              child: const Icon(Icons.add, size: 26),
             ),
           ],
         ),
