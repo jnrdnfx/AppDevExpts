@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+import React, { useContext, useState } from "react";
 import {
   View,
   Text,
@@ -7,54 +7,62 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Alert,
-  // ActivityIndicator has been removed
+  StatusBar, // Added StatusBar
+  Modal, // Added Modal
+  FlatList, // Added FlatList
+  ActivityIndicator, // Added ActivityIndicator
 } from "react-native";
 import { AuthContext } from "../context/AuthContext";
 import { useNavigation } from "@react-navigation/native";
-// Import for ImagePicker has been removed to prevent the crash
-// import ImagePicker from "react-native-image-crop-picker";
-
-// You must have a default PFP image in your assets
 const defaultPfp = require("../assets/default_pfp.png");
 
+// --- RECTIFICATION: Changed placeholder service ---
+// Switched from 'placehold.co' to 'via.placeholder.com'
+const AVATARS = [
+  "https://picsum.photos/seed/avatar1/100",
+  "https://picsum.photos/seed/avatar2/100",
+  "https://picsum.photos/seed/avatar3/100",
+  "https://picsum.photos/seed/avatar4/100",
+  "https://picsum.photos/seed/avatar5/100",
+  "https://picsum.photos/seed/avatar6/100",
+];
+// --------------------------------------------------
+
 const ProfileScreen = () => {
-  // updateUserPfp is no longer called in this file, so it's removed from here
-  const { user, userRole, isVip, logout } = useContext(AuthContext);
+  // --- MODIFICATION: Added 'updateUserAvatar' and modal state ---
+  const { user, userRole, isVip, logout, updateUserAvatar } = useContext(AuthContext);
   const navigation = useNavigation();
-  // isUploading state has been removed
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  // --------------------------------------------------------
 
   // --- MODIFIED FUNCTION ---
-  // This function no longer calls the image picker.
-  // It now shows an alert explaining the native module issue.
+  // This function now opens the avatar selection modal.
   const handleSelectImage = () => {
-    Alert.alert(
-      "Feature Not Available",
-      "This feature requires a full app build. Please rebuild your app to enable profile picture uploads."
-      // This is because 'react-native-image-crop-picker' is a native module
-      // and must be compiled into the app.
-    );
-
-    /*
-    // --- THIS IS THE CODE THAT CAUSES THE CRASH ---
-    // --- It will work only after you run 'npm install react-native-image-crop-picker'
-    // --- and then 'npx react-native run-android' or 'cd ios && pod install && npx react-native run-ios'
-    
-    ImagePicker.openPicker({ ... })
-      .then(async (image) => {
-        // ... upload logic
-      })
-      .catch((error) => {
-        // ... error handling
-      });
-    */
+    setIsModalVisible(true);
   };
+  // -------------------------
 
-  // --- REMOVED VIEW ---
-  // The 'isUploading' view has been removed as it's no longer needed.
+  // --- NEW FUNCTION ---
+  // Called when an avatar is tapped in the modal
+  const onSelectAvatar = async (avatarUrl) => {
+    setIsUpdating(true);
+    try {
+      await updateUserAvatar(avatarUrl);
+      setIsModalVisible(false); // Close modal on success
+    } catch (error) {
+      Alert.alert("Error", "Could not update avatar. Please try again.");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+  // ------------------
 
   // --- UPDATED RENDER ---
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" />
+
       {/* --- GUEST VIEW --- */}
       {userRole === "guest" && (
         <>
@@ -77,7 +85,7 @@ const ProfileScreen = () => {
       {user && (
         <>
           <View style={styles.header}>
-            {isVip && ( // Admin also has isVip=true in context
+            {isVip && (
               <View style={styles.vipRibbon}>
                 <Text style={styles.vipText}>
                   {userRole === "admin" ? "ADMIN" : "VIP"}
@@ -85,7 +93,6 @@ const ProfileScreen = () => {
               </View>
             )}
             <Image
-              // --- MODIFICATION: Use user's photoURL ---
               source={user.photoURL ? { uri: user.photoURL } : defaultPfp}
               style={styles.pfp}
             />
@@ -93,7 +100,7 @@ const ProfileScreen = () => {
           </View>
 
           <View style={styles.actions}>
-            {/* --- MODIFICATION: Favourites Button --- */}
+            {/* Favourites Button */}
             <TouchableOpacity
               style={styles.editButton}
               onPress={() => navigation.navigate("Favourites")}
@@ -101,7 +108,7 @@ const ProfileScreen = () => {
               <Text style={styles.editText}>View Your Favourites</Text>
             </TouchableOpacity>
 
-            {/* --- MODIFICATION: Show for normal users only --- */}
+            {/* Upgrade Button */}
             {!isVip && userRole === "normal" && (
               <TouchableOpacity
                 style={styles.vipButton}
@@ -111,17 +118,17 @@ const ProfileScreen = () => {
               </TouchableOpacity>
             )}
 
-            {/* --- MODIFICATION: Hooked up onPress --- */}
+            {/* Change PFP Button */}
             {isVip && (
               <TouchableOpacity
                 style={styles.editButton}
-                onPress={handleSelectImage} // This now calls the alert
+                onPress={handleSelectImage} // This now opens the modal
               >
                 <Text style={styles.editText}>Change Profile Picture</Text>
               </TouchableOpacity>
             )}
 
-            {/* --- MODIFICATION: Admin Panel Button --- */}
+            {/* Admin Panel Button */}
             {userRole === "admin" && (
               <TouchableOpacity
                 style={[styles.editButton, styles.adminButton]}
@@ -133,7 +140,7 @@ const ProfileScreen = () => {
               </TouchableOpacity>
             )}
 
-            {/* LOGOUT BUTTON (Unchanged) */}
+            {/* Logout Button */}
             <TouchableOpacity
               style={[styles.editButton, styles.logoutButton]}
               onPress={() => logout(navigation)}
@@ -145,6 +152,41 @@ const ProfileScreen = () => {
           </View>
         </>
       )}
+
+      {/* --- NEW AVATAR PICKER MODAL --- */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isModalVisible}
+        onRequestClose={() => setIsModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select an Avatar</Text>
+            {isUpdating ? (
+              <ActivityIndicator size="large" color="#1DB954" />
+            ) : (
+              <FlatList
+                data={AVATARS}
+                numColumns={3}
+                keyExtractor={(item) => item}
+                renderItem={({ item }) => (
+                  <TouchableOpacity onPress={() => onSelectAvatar(item)}>
+                    <Image source={{ uri: item }} style={styles.avatar} />
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setIsModalVisible(false)}
+            >
+              <Text style={styles.modalCloseText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      {/* ------------------------------- */}
     </SafeAreaView>
   );
 };
@@ -170,7 +212,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#1DB954",
     padding: 15,
     borderRadius: 10,
-    width: "80%", // Changed to 80% for consistency
+    width: "80%",
     alignItems: "center",
     marginBottom: 10,
   },
@@ -180,12 +222,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#1DB954",
-    width: "80%", // Changed to 80%
+    width: "80%",
     alignItems: "center",
-    marginBottom: 10, // Added for spacing
+    marginBottom: 10,
   },
   editText: { color: "#1DB954", fontWeight: "bold" },
-  // --- NEW STYLES ---
   adminButton: {
     borderColor: "#FFD700",
     backgroundColor: "#FFD700",
@@ -200,6 +241,41 @@ const styles = StyleSheet.create({
   },
   logoutButtonText: {
     color: "#c13515",
+  },
+  
+  // --- NEW MODAL STYLES ---
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.7)", // Semi-transparent background
+  },
+  modalContent: {
+    backgroundColor: "#1e1e1e",
+    borderRadius: 20,
+    padding: 20,
+    width: "80%",
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 20,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    margin: 10,
+  },
+  modalCloseButton: {
+    marginTop: 20,
+    padding: 10,
+  },
+  modalCloseText: {
+    color: "#FFD700",
+    fontSize: 16,
   },
 });
 

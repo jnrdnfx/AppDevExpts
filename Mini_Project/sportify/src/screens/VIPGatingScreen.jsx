@@ -3,19 +3,48 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from "rea
 import * as Animatable from "react-native-animatable";
 import { AuthContext } from "../context/AuthContext";
 import { SafeAreaView } from "react-native-safe-area-context";
+// --- RECTIFICATION: Import Firestore services ---
+import { db } from "../services/firebase";
+import { doc, updateDoc } from "firebase/firestore";
+// ----------------------------------------------
 
 const VIPGatingScreen = () => {
-  const { userRole, isVip } = useContext(AuthContext);
+  // --- RECTIFICATION: Get the 'user' object to know WHO is requesting ---
+  const { userRole, isVip, user } = useContext(AuthContext);
+  // ------------------------------------------------------------------
   const [requestSent, setRequestSent] = useState(false);
 
-  const handleRequestVIP = () => {
+  // --- RECTIFICATION: Made function async to talk to Firestore ---
+  const handleRequestVIP = async () => {
+  // -------------------------------------------------------------
     if (requestSent) {
       Alert.alert("VIP Request", "You have already requested VIP. Please wait for approval.");
       return;
     }
-    // Mock sending request to admin
-    setRequestSent(true);
-    Alert.alert("VIP Request Sent", "Wait until an admin approves your request.");
+
+    // --- RECTIFICATION: Check if user is logged in ---
+    if (!user) {
+      Alert.alert("Error", "You must be logged in to make a request.");
+      return;
+    }
+    // -------------------------------------------------
+
+    try {
+      // --- RECTIFICATION: Send request to Firestore ---
+      // This creates the vipRequest flag that the Admin Panel looks for.
+      const userDocRef = doc(db, "users", user.uid);
+      await updateDoc(userDocRef, {
+        vipRequest: true
+      });
+      // ---------------------------------------------
+      
+      setRequestSent(true);
+      Alert.alert("VIP Request Sent", "Wait until an admin approves your request.");
+
+    } catch (error) {
+      console.error("Error sending VIP request: ", error);
+      Alert.alert("Error", "Could not send request. Please try again.");
+    }
   };
 
   return (

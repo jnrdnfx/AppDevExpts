@@ -1,96 +1,188 @@
-// HomeScreen.jsx
-import React, { useState, useEffect } from "react";
-import { View, Text, ScrollView, Image, StyleSheet, Dimensions, TouchableOpacity } from "react-native";
-import { getFavourites, addFavourite, removeFavourite } from "../utils/favourites";
+import React, { useState, useEffect, useContext } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  Image,
+  StyleSheet,
+  Dimensions,
+  TouchableOpacity,
+  ActivityIndicator,
+  StatusBar,
+} from "react-native";
+// We need getFavourites from your utils
+// import { getFavourites, addFavourite, removeFavourite } from "../utils/favourites";
 import { SafeAreaView } from "react-native-safe-area-context";
+import axios from "axios";
+import { AuthContext } from "../context/AuthContext";
 
 const { width } = Dimensions.get("window");
+const API_KEY = "7640a8de8074b8683b8471a35200d676"; // Use your key
 
-// Mock Data
-const footballMatches = [
-  {
-    id: "premier_astonvilla_manunited",
-    league: "Premier League",
-    home: "Aston Villa",
-    homeLogo: "https://media.api-sports.io/football/teams/66.png",
-    away: "Man United",
-    awayLogo: "https://media.api-sports.io/football/teams/33.png",
-    score: "2 - 1",
+// We need a dummy implementation of favourites for the code to run
+// Replace this with your actual ../utils/favourites import
+const FavouritesStore = {
+  _favs: [],
+  getFavourites: async () => [...FavouritesStore._favs],
+  addFavourite: async (item) => {
+    if (!FavouritesStore._favs.find(f => f.id === item.id && f.sport === item.sport)) {
+      FavouritesStore._favs.push(item);
+    }
   },
-  {
-    id: "laliga_realmadrid_sevilla",
-    league: "La Liga",
-    home: "Real Madrid",
-    homeLogo: "https://media.api-sports.io/football/teams/86.png",
-    away: "Sevilla",
-    awayLogo: "https://media.api-sports.io/football/teams/559.png",
-    score: "2 - 2",
+  removeFavourite: async (item) => {
+    FavouritesStore._favs = FavouritesStore._favs.filter(f => !(f.id === item.id && f.sport === item.sport));
   },
-];
-
-const nbaGames = [
-  {
-    id: "lakers_warriors",
-    home: "Lakers",
-    homeLogo: "https://upload.wikimedia.org/wikipedia/commons/3/3c/Los_Angeles_Lakers_logo.svg",
-    away: "Warriors",
-    awayLogo: "https://upload.wikimedia.org/wikipedia/en/0/01/Golden_State_Warriors_logo.svg",
-    score: "102 - 99",
-  },
-  {
-    id: "bulls_celtics",
-    home: "Bulls",
-    homeLogo: "https://upload.wikimedia.org/wikipedia/en/6/67/Chicago_Bulls_logo.svg",
-    away: "Celtics",
-    awayLogo: "https://upload.wikimedia.org/wikipedia/en/8/8f/Boston_Celtics.svg",
-    score: "110 - 108",
-  },
-];
-
-const f1Race = {
-  id: "abu_dhabi_gp",
-  raceName: "Abu Dhabi Grand Prix",
-  circuitName: "Yas Marina Circuit",
-  circuitImage: "https://media.api-sports.io/formula-1/circuits/23.png",
-  standings: [
-    {
-      id: "bottas",
-      position: 1,
-      driver: "Valtteri Bottas",
-      team: "Mercedes",
-      time: "1:25:27.325",
-      driverImage: "https://media.api-sports.io/formula-1/drivers/5.png",
-    },
-    {
-      id: "hamilton",
-      position: 2,
-      driver: "Lewis Hamilton",
-      team: "Mercedes",
-      time: "+20.886",
-      driverImage: "https://media.api-sports.io/formula-1/drivers/20.png",
-    },
-    {
-      id: "verstappen",
-      position: 3,
-      driver: "Max Verstappen",
-      team: "Red Bull",
-      time: "+22.520",
-      driverImage: "https://media.api-sports.io/formula-1/drivers/25.png",
-    },
-  ],
 };
+const { getFavourites, addFavourite, removeFavourite } = FavouritesStore;
+// --- End of dummy implementation ---
+
 
 export default function HomeScreen() {
   const [favs, setFavs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  // --- API DATA STATES ---
+  const [footballMatches, setFootballMatches] = useState([]);
+  const [basketballGames, setBasketballGames] = useState([]); // Renamed
+  const [f1Race, setF1Race] = useState(null);
+  
+  const { user } = useContext(AuthContext);
+
+  // --- DATA FETCHING ---
   useEffect(() => {
-    const fetchFavs = async () => {
-      const data = await getFavourites();
-      setFavs(data);
+    const fetchAllData = async () => {
+      if (user) {
+        const data = await getFavourites();
+        setFavs(data);
+      }
+      try {
+        setLoading(true);
+        setError(null);
+        await Promise.all([
+          fetchFootball(),
+          fetchBasketball(), // Changed
+          fetchF1()
+        ]);
+      } catch (err) {
+        console.error("Error fetching data", err);
+        setError("Could not load scores. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
     };
-    fetchFavs();
-  }, []);
+    
+    fetchAllData();
+  }, [user]);
 
+  // --- API CALL: FOOTBALL ---
+  const fetchFootball = async () => {
+    const leagues = [39, 140]; // Premier League, La Liga
+    const season = 2023; // Use 2023 season
+    let matches = [];
+    
+    for (const leagueId of leagues) {
+      // --- RECTIFICATION: Removed 'last=' parameter as requested ---
+      const res = await axios.get(
+        `https://v3.football.api-sports.io/fixtures?league=${leagueId}&season=${season}`,
+        { headers: { "x-apisports-key": API_KEY } }
+      );
+      
+      // Get the first 2 matches from the response
+      const someMatches = res.data.response.slice(0, 2);
+      for (const match of someMatches) {
+        if (match) {
+          // Normalize data
+          matches.push({
+            id: match.fixture.id,
+            league: match.league.name,
+            home: match.teams.home.name,
+            homeLogo: match.teams.home.logo,
+            away: match.teams.away.name,
+            awayLogo: match.teams.away.logo,
+            score: `${match.goals.home ?? 0} - ${match.goals.away ?? 0}`,
+          });
+        }
+      }
+    }
+    setFootballMatches(matches);
+  };
+
+  // --- API CALL: BASKETBALL (Replaced NBA) ---
+  const fetchBasketball = async () => {
+    const season = "2022-2023"; // Use 2022-2023 season
+    const res = await axios.get(
+      `https://v1.basketball.api-sports.io/games?league=12&season=${season}`,
+      { headers: { 
+          "x-rapidapi-host": "v1.basketball.api-sports.io",
+          "x-rapidapi-key": API_KEY 
+        } 
+      }
+    );
+    
+    const games = res.data.response;
+    if (games && games.length) {
+      // Pick 3 random games
+      const randomGames = [];
+      for (let i = 0; i < 3 && games.length > 0; i++) {
+        const randomIndex = Math.floor(Math.random() * games.length);
+        randomGames.push(games.splice(randomIndex, 1)[0]);
+      }
+
+      // Normalize data
+      const normalizedGames = randomGames.map(game => ({
+        id: game.id,
+        home: game.teams.home.name,
+        homeLogo: game.teams.home.logo,
+        away: game.teams.away.name,
+        awayLogo: game.teams.away.logo,
+        score: `${game.scores.home.total ?? 0} - ${game.scores.away.total ?? 0}`,
+      }));
+      setBasketballGames(normalizedGames);
+    }
+  };
+
+  // --- API CALL: F1 ---
+  const fetchF1 = async () => {
+    // --- RECTIFICATION: Using 2023 season ---
+    const season = 2023; 
+    // 1. Get the last race of the season
+    // --- RECTIFICATION: Re-added 'last=1' as it was working before ---
+    const raceRes = await axios.get(
+      `https://v1.formula-1.api-sports.io/races?season=${season}`,
+      { headers: { "x-apisports-key": API_KEY } }
+    );
+    
+    const lastRace = raceRes.data.response[0];
+    if (!lastRace) return;
+
+    // 2. Get the rankings for that race
+    const rankRes = await axios.get(
+      `https://v1.formula-1.api-sports.io/rankings/races?race=${lastRace.id}`,
+      { headers: { "x-apisports-key": API_KEY } }
+    );
+
+    const rankings = rankRes.data.response;
+    if (rankings && rankings.length) {
+      // Normalize data
+      setF1Race({
+        id: lastRace.id,
+        raceName: lastRace.competition.name,
+        circuitName: lastRace.circuit.name,
+        circuitImage: lastRace.circuit.image,
+        standings: rankings.slice(0, 3).map(driver => ({ // Get top 3
+          id: driver.driver.id,
+          position: driver.position,
+          driver: driver.driver.name,
+          team: driver.team.name,
+          time: driver.time,
+          driverImage: driver.driver.image,
+        })),
+      });
+    }
+  };
+  
+  // --- Favourites logic (unchanged) ---
   const toggleFavourite = async (item, sport) => {
     const exists = favs.find(f => f.id === item.id && f.sport === sport);
     if (exists) {
@@ -104,75 +196,104 @@ export default function HomeScreen() {
 
   const isFav = (item, sport) => favs.some(f => f.id === item.id && f.sport === sport);
 
+  // --- RENDER ---
   return (
-    <ScrollView style={styles.container}>
-    <SafeAreaView>
+    <SafeAreaView style={{flex: 1, backgroundColor: "#121212"}}>
+      <StatusBar barStyle="light-content" />
       <Text style={styles.header}>Scores</Text>
+      
+      {loading && (
+        <ActivityIndicator size="large" color="#FFD700" style={{ marginTop: 50 }} />
+      )}
+      
+      {error && (
+        <Text style={styles.errorText}>{error}</Text>
+      )}
 
-      {/* Football Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Football</Text>
-        {footballMatches.map((match, index) => (
-          <View key={index} style={styles.matchRow}>
-            <Text style={styles.leagueText}>{match.league}</Text>
-            <View style={styles.scoreRow}>
-              <Image source={{ uri: match.homeLogo }} style={styles.teamLogo} />
-              <Text style={styles.teamText}>{match.home}</Text>
-              <Text style={styles.scoreText}>{match.score}</Text>
-              <Text style={styles.teamText}>{match.away}</Text>
-              <Image source={{ uri: match.awayLogo }} style={styles.teamLogo} />
-              <TouchableOpacity onPress={() => toggleFavourite(match, "football")}>
-                <Text style={{ color: isFav(match, "football") ? "red" : "white", marginLeft: 8 }}>❤️</Text>
-              </TouchableOpacity>
+      {!loading && !error && (
+        <ScrollView style={styles.container}>
+          {/* Football Card */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Football</Text>
+            {footballMatches.length > 0 ? (
+              footballMatches.map((match) => (
+                <View key={match.id} style={styles.matchRow}>
+                  <Text style={styles.leagueText}>{match.league}</Text>
+                  <View style={styles.scoreRow}>
+                    <Image source={{ uri: match.homeLogo }} style={styles.teamLogo} />
+                    <Text style={styles.teamText}>{match.home}</Text>
+                    <Text style={styles.scoreText}>{match.score}</Text>
+                    <Text style={styles.teamText}>{match.away}</Text>
+                    <Image source={{ uri: match.awayLogo }} style={styles.teamLogo} />
+                    <TouchableOpacity onPress={() => toggleFavourite(match, "football")}>
+                      <Text style={{ color: isFav(match, "football") ? "red" : "white", marginLeft: 8 }}>❤️</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyText}>No recent football scores available.</Text>
+            )}
+          </View>
+
+          {/* Basketball Card (Replaced NBA) */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Basketball</Text>
+            {basketballGames.length > 0 ? (
+              basketballGames.map((game) => (
+                <View key={game.id} style={styles.scoreRow}>
+                  <Image source={{ uri: game.homeLogo }} style={styles.teamLogo} />
+                  <Text style={styles.teamText}>{game.home}</Text>
+                  <Text style={styles.scoreText}>{game.score}</Text>
+                  <Text style={styles.teamText}>{game.away}</Text>
+                  <Image source={{ uri: game.awayLogo }} style={styles.teamLogo} />
+                  <TouchableOpacity onPress={() => toggleFavourite(game, "nba")}>
+                    <Text style={{ color: isFav(game, "nba") ? "red" : "white", marginLeft: 8 }}>❤️</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyText}>No recent basketball scores available.</Text>
+            )}
+          </View>
+
+          {/* F1 Card */}
+          {f1Race && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>F1</Text>
+              <Text style={styles.raceName}>{f1Race.raceName}</Text>
+              <Text style={styles.circuitName}>{f1Race.circuitName}</Text>
+              <Image source={{ uri: f1Race.circuitImage }} style={styles.circuitImage} />
+              {f1Race.standings.map((driver) => (
+                <View key={driver.id} style={styles.standingRow}>
+                  <Text style={styles.position}>{driver.position}</Text>
+                  <Image source={{ uri: driver.driverImage }} style={styles.driverLogo} />
+                  <View>
+                    <Text style={styles.driverName}>{driver.driver}</Text>
+                    <Text style={styles.teamName}>{driver.team}</Text>
+                  </View>
+                  <Text style={styles.driverTime}>{driver.time}</Text>
+                  <TouchableOpacity onPress={() => toggleFavourite(driver, "f1")}>
+                    <Text style={{ color: isFav(driver, "f1") ? "red" : "white", marginLeft: 8 }}>❤️</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
             </View>
-          </View>
-        ))}
-      </View>
-
-      {/* NBA Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>NBA</Text>
-        {nbaGames.map((game, index) => (
-          <View key={index} style={styles.scoreRow}>
-            <Image source={{ uri: game.homeLogo }} style={styles.teamLogo} />
-            <Text style={styles.teamText}>{game.home}</Text>
-            <Text style={styles.scoreText}>{game.score}</Text>
-            <Text style={styles.teamText}>{game.away}</Text>
-            <Image source={{ uri: game.awayLogo }} style={styles.teamLogo} />
-            <TouchableOpacity onPress={() => toggleFavourite(game, "nba")}>
-              <Text style={{ color: isFav(game, "nba") ? "red" : "white", marginLeft: 8 }}>❤️</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-      </View>
-
-      {/* F1 Card */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>F1</Text>
-        <Text style={styles.raceName}>{f1Race.raceName}</Text>
-        <Text style={styles.circuitName}>{f1Race.circuitName}</Text>
-        <Image source={{ uri: f1Race.circuitImage }} style={styles.circuitImage} />
-        {f1Race.standings.map((driver, index) => (
-          <View key={index} style={styles.standingRow}>
-            <Text style={styles.position}>{driver.position}</Text>
-            <Image source={{ uri: driver.driverImage }} style={styles.driverLogo} />
-            <View>
-              <Text style={styles.driverName}>{driver.driver}</Text>
-              <Text style={styles.teamName}>{driver.team}</Text>
+          )}
+          {/* Fallback for F1 if it's not loading and still null */}
+          {!f1Race && !loading && (
+             <View style={styles.card}>
+              <Text style={styles.cardTitle}>F1</Text>
+              <Text style={styles.emptyText}>No recent F1 data available.</Text>
             </View>
-            <Text style={styles.driverTime}>{driver.time}</Text>
-            <TouchableOpacity onPress={() => toggleFavourite(driver, "f1")}>
-              <Text style={{ color: isFav(driver, "f1") ? "red" : "white", marginLeft: 8 }}>❤️</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-      </View>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
-    </ScrollView>
-    
   );
 }
 
+// --- STYLES (Unchanged from your file) ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -274,5 +395,18 @@ const styles = StyleSheet.create({
     color: "#FFD700",
     fontWeight: "bold",
     marginLeft: "auto",
+  },
+  // Added error style
+  errorText: {
+    color: "#c13515",
+    textAlign: "center",
+    fontSize: 16,
+    marginTop: 40,
+  },
+  // Added empty style
+  emptyText: {
+    color: "#aaa",
+    fontStyle: "italic",
+    textAlign: "center",
   },
 });
