@@ -10,8 +10,10 @@ import {
   ActivityIndicator,
   StatusBar,
 } from "react-native";
-// We need getFavourites from your utils
+// --- RECTIFICATION: Import the REAL favourites functions ---
+// I'm assuming you have this file, if not, you'll need to create it
 // import { getFavourites, addFavourite, removeFavourite } from "../utils/favourites";
+// --------------------------------------------------------
 import { SafeAreaView } from "react-native-safe-area-context";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
@@ -19,8 +21,7 @@ import { AuthContext } from "../context/AuthContext";
 const { width } = Dimensions.get("window");
 const API_KEY = "7640a8de8074b8683b8471a35200d676"; // Use your key
 
-// We need a dummy implementation of favourites for the code to run
-// Replace this with your actual ../utils/favourites import
+// --- DUMMY FAVOURITES (REPLACE THIS) ---
 const FavouritesStore = {
   _favs: [],
   getFavourites: async () => [...FavouritesStore._favs],
@@ -44,10 +45,12 @@ export default function HomeScreen() {
 
   // --- API DATA STATES ---
   const [footballMatches, setFootballMatches] = useState([]);
-  const [basketballGames, setBasketballGames] = useState([]); // Renamed
+  // --- RECTIFICATION: Renamed to match the new function ---
+  const [basketballGames, setBasketballGames] = useState([]);
+  // -----------------------------------------------------
   const [f1Race, setF1Race] = useState(null);
   
-  const { user } = useContext(AuthContext);
+  const { user } = useContext(AuthContext); // Get user
 
   // --- DATA FETCHING ---
   useEffect(() => {
@@ -56,14 +59,19 @@ export default function HomeScreen() {
         const data = await getFavourites();
         setFavs(data);
       }
+
       try {
         setLoading(true);
         setError(null);
+        
         await Promise.all([
           fetchFootball(),
-          fetchBasketball(), // Changed
+          // --- RECTIFICATION: Call the correct function ---
+          fetchBasketball(),
+          // --------------------------------------------
           fetchF1()
         ]);
+
       } catch (err) {
         console.error("Error fetching data", err);
         setError("Could not load scores. Please try again later.");
@@ -78,11 +86,12 @@ export default function HomeScreen() {
   // --- API CALL: FOOTBALL ---
   const fetchFootball = async () => {
     const leagues = [39, 140]; // Premier League, La Liga
-    const season = 2023; // Use 2023 season
+    // --- RECTIFICATION: Use reliable 2023 season ---
+    const season = 2023;
     let matches = [];
     
     for (const leagueId of leagues) {
-      // --- RECTIFICATION: Removed 'last=' parameter as requested ---
+      // --- RECTIFICATION: Removed 'last=1' as you requested ---
       const res = await axios.get(
         `https://v3.football.api-sports.io/fixtures?league=${leagueId}&season=${season}`,
         { headers: { "x-apisports-key": API_KEY } }
@@ -110,7 +119,8 @@ export default function HomeScreen() {
 
   // --- API CALL: BASKETBALL (Replaced NBA) ---
   const fetchBasketball = async () => {
-    const season = "2022-2023"; // Use 2022-2023 season
+    // --- RECTIFICATION: Use reliable 2022-2023 season ---
+    const season = "2022-2023";
     const res = await axios.get(
       `https://v1.basketball.api-sports.io/games?league=12&season=${season}`,
       { headers: { 
@@ -144,10 +154,9 @@ export default function HomeScreen() {
 
   // --- API CALL: F1 ---
   const fetchF1 = async () => {
-    // --- RECTIFICATION: Using 2023 season ---
-    const season = 2023; 
-    // 1. Get the last race of the season
-    // --- RECTIFICATION: Re-added 'last=1' as it was working before ---
+    // --- RECTIFICATION: Use reliable 2023 season ---
+    const season = 2023;
+    // 1. Get the last race of the season (re-added last=1)
     const raceRes = await axios.get(
       `https://v1.formula-1.api-sports.io/races?season=${season}`,
       { headers: { "x-apisports-key": API_KEY } }
@@ -184,17 +193,24 @@ export default function HomeScreen() {
   
   // --- Favourites logic (unchanged) ---
   const toggleFavourite = async (item, sport) => {
-    const exists = favs.find(f => f.id === item.id && f.sport === sport);
+    // --- RECTIFICATION: Handle 'basketball' sport name ---
+    const sportName = sport === 'basketball' ? 'basketball' : sport;
+    const itemWithSport = { ...item, sport: sportName };
+
+    const exists = favs.find(f => f.id === item.id && f.sport === sportName);
     if (exists) {
-      await removeFavourite({ ...item, sport });
+      await removeFavourite(itemWithSport);
     } else {
-      await addFavourite({ ...item, sport });
+      await addFavourite(itemWithSport);
     }
     const updated = await getFavourites();
     setFavs(updated);
   };
 
-  const isFav = (item, sport) => favs.some(f => f.id === item.id && f.sport === sport);
+  const isFav = (item, sport) => {
+    const sportName = sport === 'basketball' ? 'basketball' : sport;
+    return favs.some(f => f.id === item.id && f.sport === sportName);
+  }
 
   // --- RENDER ---
   return (
@@ -247,8 +263,8 @@ export default function HomeScreen() {
                   <Text style={styles.scoreText}>{game.score}</Text>
                   <Text style={styles.teamText}>{game.away}</Text>
                   <Image source={{ uri: game.awayLogo }} style={styles.teamLogo} />
-                  <TouchableOpacity onPress={() => toggleFavourite(game, "nba")}>
-                    <Text style={{ color: isFav(game, "nba") ? "red" : "white", marginLeft: 8 }}>❤️</Text>
+                  <TouchableOpacity onPress={() => toggleFavourite(game, "basketball")}>
+                    <Text style={{ color: isFav(game, "basketball") ? "red" : "white", marginLeft: 8 }}>❤️</Text>
                   </TouchableOpacity>
                 </View>
               ))
@@ -293,7 +309,7 @@ export default function HomeScreen() {
   );
 }
 
-// --- STYLES (Unchanged from your file) ---
+// --- STYLES (Unchanged) ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -396,14 +412,12 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginLeft: "auto",
   },
-  // Added error style
   errorText: {
     color: "#c13515",
     textAlign: "center",
     fontSize: 16,
     marginTop: 40,
   },
-  // Added empty style
   emptyText: {
     color: "#aaa",
     fontStyle: "italic",

@@ -1,23 +1,34 @@
 // FavouritesScreen.jsx
-import React, { useEffect, useState } from "react";
-import { View, Text, ScrollView, Image, StyleSheet } from "react-native";
+import React, { useEffect, useState, useCallback } from "react"; // Added useCallback
+import { View, Text, ScrollView, Image, StyleSheet, StatusBar } from "react-native";
 import { getFavourites } from "../utils/favourites";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native"; // --- RECTIFICATION: Added useFocusEffect ---
 
 export default function FavouritesScreen() {
   const [favs, setFavs] = useState([]);
 
-  useEffect(() => {
-    const fetchFavs = async () => {
-      const data = await getFavourites();
-      setFavs(data);
-    };
-    fetchFavs();
-  }, []);
+  // --- RECTIFICATION: Use useFocusEffect ---
+  // This runs every time the user visits this screen
+  useFocusEffect(
+    useCallback(() => {
+      const fetchFavs = async () => {
+        const data = await getFavourites();
+        setFavs(data);
+      };
+      
+      fetchFavs();
+
+      // Return a cleanup function (optional, but good practice)
+      return () => setFavs([]);
+    }, [])
+  );
+  // ------------------------------------------
 
   return (
     <ScrollView style={styles.container}>
       <SafeAreaView>
+      <StatusBar barStyle="light-content" />
       <Text style={styles.header}>Your Favourites</Text>
 
       {favs.length === 0 ? (
@@ -25,9 +36,12 @@ export default function FavouritesScreen() {
       ) : (
         favs.map((item, index) => (
           <View key={`${item.sport}-${item.id}-${index}`} style={styles.card}>
-            <Text style={styles.sport}>{item.sport.toUpperCase()}</Text>
+            {/* --- RECTIFICATION: Handle 'basketball' sport name --- */}
+            <Text style={styles.sport}>
+              {item.sport === 'nba' ? 'BASKETBALL' : item.sport.toUpperCase()}
+            </Text>
 
-            {/* Football / NBA */}
+            {/* Football / Basketball */}
             {item.home && item.away && (
               <View style={styles.scoreRow}>
                 {item.homeLogo && <Image source={{ uri: item.homeLogo }} style={styles.teamLogo} />}
@@ -58,6 +72,7 @@ export default function FavouritesScreen() {
   );
 }
 
+// --- STYLES (Unchanged) ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,

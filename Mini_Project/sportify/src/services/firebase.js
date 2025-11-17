@@ -1,5 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+// --- MODIFICATION START ---
+// Import initializeAuth and persistence functions
+import { initializeAuth, getReactNativePersistence } from "firebase/auth"; 
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
+// --- MODIFICATION END ---
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = { 
@@ -9,11 +13,17 @@ const firebaseConfig = {
   storageBucket: "sportify-104fe.firebasestorage.app",
   messagingSenderId: "731708126671",
   appId: "1:731708126671:web:375d142d5846bac2dc4eba",
- };
+};
 
 const app = initializeApp(firebaseConfig);
 
-export const auth = getAuth(app);  // NO persistence inside Expo go
+// --- RECTIFICATION ---
+// Replace 'getAuth(app)' with 'initializeAuth' and pass in persistence
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+});
+// ---------------------
+
 export const db = getFirestore(app);
 
 export default app;
